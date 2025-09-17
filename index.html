@@ -195,6 +195,26 @@
             color: #4caf50;
             margin-bottom: 10px;
         }
+        
+        .status {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 5px;
+            text-align: center;
+            display: none;
+        }
+        
+        .success {
+            background: rgba(0, 255, 0, 0.2);
+            border: 1px solid #4caf50;
+            display: block;
+        }
+        
+        .error {
+            background: rgba(255, 0, 0, 0.2);
+            border: 1px solid #f44336;
+            display: block;
+        }
     </style>
 </head>
 <body>
@@ -209,6 +229,7 @@
             <input type="text" id="botToken" placeholder="Masukkan Token Bot Telegram">
             <input type="text" id="chatId" placeholder="Masukkan Chat ID Telegram">
             <button id="saveConfig">Simpan Konfigurasi</button>
+            <div id="configStatus" class="status"></div>
         </div>
         
         <div class="input-section">
@@ -285,6 +306,7 @@
         const originalUrlInput = document.getElementById('originalUrl');
         const shortenedLinkElement = document.getElementById('shortenedLink');
         const resultSection = document.getElementById('resultSection');
+        const configStatus = document.getElementById('configStatus');
         
         // Muat konfigurasi yang disimpan
         window.addEventListener('DOMContentLoaded', () => {
@@ -301,15 +323,63 @@
             const chatId = chatIdInput.value.trim();
             
             if (!token || !chatId) {
-                alert('Token dan Chat ID harus diisi!');
+                showStatus('Token dan Chat ID harus diisi!', 'error');
                 return;
             }
             
-            localStorage.setItem(BOT_TOKEN_KEY, token);
-            localStorage.setItem(CHAT_ID_KEY, chatId);
-            
-            alert('Konfigurasi berhasil disimpan!');
+            // Test the token and chat ID
+            testTelegramConfig(token, chatId).then(success => {
+                if (success) {
+                    localStorage.setItem(BOT_TOKEN_KEY, token);
+                    localStorage.setItem(CHAT_ID_KEY, chatId);
+                    showStatus('Konfigurasi berhasil disimpan dan tested!', 'success');
+                } else {
+                    showStatus('Token atau Chat ID tidak valid!', 'error');
+                }
+            }).catch(() => {
+                showStatus('Error testing configuration!', 'error');
+            });
         });
+        
+        // Tampilkan status konfigurasi
+        function showStatus(message, type) {
+            configStatus.textContent = message;
+            configStatus.className = 'status ' + type;
+            setTimeout(() => {
+                configStatus.style.display = 'none';
+            }, 3000);
+        }
+        
+        // Test Telegram configuration
+        async function testTelegramConfig(token, chatId) {
+            try {
+                const response = await fetch(`https://api.telegram.org/bot${token}/getMe`);
+                const data = await response.json();
+                
+                if (data.ok) {
+                    // Try sending a test message
+                    const testResponse = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            chat_id: chatId,
+                            text: '✅ Konfigurasi SecureLink Generator berhasil! Bot sudah siap menerima notifikasi.',
+                            parse_mode: 'HTML'
+                        })
+                    });
+                    
+                    const testData = await testResponse.json();
+                    return testData.ok;
+                }
+                
+                return false;
+            } catch (error) {
+                console.error('Error testing Telegram config:', error);
+                return false;
+            }
+        }
         
         // Generate link
         generateBtn.addEventListener('click', function() {
